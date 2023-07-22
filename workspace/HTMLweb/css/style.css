@@ -1,0 +1,55 @@
+@charset "utf-8";
+
+* {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: black;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+
+    & > footer {
+        margin-block-start: auto;
+    }
+
+    & > .message-container {
+        overflow-x: hidden;
+        
+        & > h1 {
+            color: #12ab85;
+            animation: slideIn 6s linear infinite;
+            word-break: keep-all;
+            white-space: nowrap;
+        }
+    }
+
+    & h2 {
+        font-size: 2rem;
+        color: #12ab85;
+    }
+
+    & .adv {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: purple;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+}
+
+@keyframes slideIn {
+    from {
+        margin-inline-start: 100%;
+    }
+
+    to {
+        margin-inline-start: -100%;
+    }
+}

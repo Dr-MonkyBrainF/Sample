@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <title>Document</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header>
+        <h2>
+            Welcome.
+        </h2>
+    </header>
+    <div class="message-container">
+        <h1>
+            Hello world! Thank you for visiting our store.
+        </h1>
+    </div>
+    <p id="payment" style="color: red; display: none;">
+    </p>
+    <footer>
+        <h2>
+            See You.
+        </h2>
+    </footer>
+    <div
+        id="adv"
+        class="adv"
+        style="display: none;"
+    >
+        15秒の広告です
+    </div>
+</body>
+<script>
+    /** @type {HTMLElement} */
+    const adv = document.getElementById('adv')
+    /** @type {HTMLElement} */
+    const pay = document.getElementById('payment');
+    const amount = 6000;
+    let count = 1;
+    let payment = 0;
+    const alwaysAlert = () => {
+        if (count === 5) {
+            adv.style.display = "";
+            setTimeout(() => adv.style.display = "none", 15000);
+            return;
+        }
+        alert('お買い上げありがとうございます！');
+        if (confirm(`お買い上げ金額は「${amount * count}円」になります`)) {
+            pay.style.display = "block";
+            payment += amount * count;
+            pay.innerText = `Your payment is ${payment} yen!!`;
+            setTimeout(alwaysAlert, amount * count);
+            count = 1;
+            return;
+        }
+        count++;
+        alwaysAlert();
+    }
+    setTimeout(alwaysAlert, 10000);
+</script>
+</html>
