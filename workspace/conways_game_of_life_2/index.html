@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conway's Game of Life</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        .wrapper {
+            display: flex;
+            min-height: 100vh;
+
+            .container {
+                display: flex;
+                column-gap: 1rem;
+
+                .d-none {
+                    display: none !important;
+                }
+
+                .main {
+                    --size: min(2.5vw, 2.5vh);
+                    line-height: var(--size);
+                    font-size: var(--size);
+                    max-height: 100vh;
+                    overflow: hidden;
+
+                    &.app {
+                        white-space: pre-wrap;
+                    }
+
+                    & > * {
+                        height: var(--size);
+
+                        & > input[type="checkbox"] {
+                            width: var(--size);
+                            height: var(--size);
+                            cursor: pointer;
+                        }
+                    }
+                }
+
+                .setting-area {
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+
+                    .radio-area {
+                        display: flex;
+                        flex-direction: column;
+                        margin-block-start: 1rem;
+                        .select {
+                            display: flex;
+                            align-items: center;
+                            column-gap: 1rem;
+
+                            input[type="radio"], label {
+                                cursor: pointer;
+                            }
+                        }
+                    }
+
+                    .score-area {
+                        display: flex;
+                        flex-direction: column;
+                        margin-block-start: 1rem;
+                        .row {
+                            display: flex;
+                            align-items: center;
+                            column-gap: 1rem;
+                        }
+                    }
+
+                    .button-area {
+                        display: flex;
+                        flex-direction: column;
+                        row-gap: 1rem;
+                        margin-block-end: 1rem;
+                        .button {
+                            --color: #179fff;
+                            border: 2px solid var(--color);
+                            font-size: 1.2rem;
+                            padding-inline: 0.7rem;
+                            padding-block: 0.3rem;
+                            background-color: white;
+                            border-radius: 0.4rem;
+                            color: var(--color);
+                            cursor: pointer;
+
+                            &:hover {
+                                color: white;
+                                background-color: var(--color);
+                            }
+
+                            &.primary {
+                                background-color: var(--color);
+                                color: white;
+
+                                &:hover {
+                                    color: var(--color);
+                                    background-color: white;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <div id="app" class="main app d-none"></div>
+            <div id="setting" class="main"></div>
+            <div class="setting-area">
+                <div class="radio-area" id="player_select">
+                    <div class="select">
+                        <input type="radio" name="player" id="player1" checked>
+                        <label for="player1">■</label>
+                    </div>
+                    <div class="select">
+                        <input type="radio" name="player" id="player2">
+                        <label for="player2">◆</label>
+                    </div>
+                </div>
+                <div class="score-area d-none" id="score_area">
+                    <div class="row" id="score_1"></div>
+                    <div class="row" id="score_2"></div>
+                </div>
+                <div class="button-area">
+                    <button id="stop" class="button d-none" type="button">stop</button>
+                    <button id="reset" class="button" type="button">reset</button>
+                    <button id="start" class="button primary" type="button">start</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    const appEl = document.getElementById('app');
+    const settingEl = document.getElementById('setting');
+    const startEl = document.getElementById('start');
+    const stopEl = document.getElementById('stop');
+    const resetEl = document.getElementById('reset');
+    const playerSelectEl = document.getElementById('player_select');
+    const player1El = document.getElementById('player1');
+    const player2El = document.getElementById('player2');
+    const scoreAreaEl = document.getElementById('score_area');
+    const score1El = document.getElementById('score_1');
+    const score2El = document.getElementById('score_2');
+
+    const CLASS_NAME = 'd-none';
+    const WIDTH = 40;
+    const HEIGHT = 40;
+    const DEAD = '□';
+    const ONE = '■';
+    const TWO = '◆';
+    const INTERVAL = 200;
+    let timer;
+
+    const createUniverse = () => Array.from({ length: HEIGHT }, () => Array.from({ length: WIDTH }, () => DEAD));
+
+    let universe = createUniverse();
+
+    const getCheckedCell = () => settingEl.querySelectorAll('input[type="checkbox"]:checked');
+
+    const setting2universe = () => {
+        universe = createUniverse();
+        const isOne = player1El.checked;
+        for (const checkEl of getCheckedCell()) {
+            const { row, col } = checkEl.dataset;
+            universe[Number(row)][Number(col)] = (isOne && !checkEl.disabled) || (!isOne && checkEl.disabled) ? ONE : TWO;
+        }
+    };
+
+    const getNeighbors = (row, col) => {
+        let one = 0;
+        let two = 0;
+        for (const deltaRow of [HEIGHT - 1, 0, 1]) {
+            for (const deltaCol of [WIDTH - 1, 0, 1]) {
+                if (deltaRow === 0 && deltaCol === 0) continue;
+                switch (universe[(row + deltaRow) % HEIGHT][(col + deltaCol) % WIDTH]) {
+                    case ONE: {
+                        one++;
+                        break;
+                    }
+                    case TWO: {
+                        two++;
+                        break;
+                    }
+                    default: {
+                        break;
+                    }
+                }
+            }
+        }
+        return {
+            total: one + two,
+            one,
+            two,
+        };
+    };
+
+    const next = () => {
+        const newUniverse = createUniverse();
+        for (const [row, rowData] of universe.entries()) {
+            for (const [col, value] of rowData.entries()) {
+                const { total, one, two } = getNeighbors(row, col);
+                if (value !== DEAD) {
+                    if (total === 2 || total === 3) {
+                        newUniverse[row][col] = value;
+                    }
+                    if (total < 2) {
+                        newUniverse[row][col] = DEAD;
+                    }
+                    if (total > 3) {
+                        newUniverse[row][col] = DEAD;
+                    }
+                }
+                else {
+                    if (total === 3) {
+                        newUniverse[row][col] = one > two ? ONE : TWO;
+                    }
+                }
+
+            }
+        }
+        universe = newUniverse;
+    };
+
+    const draw = () => {
+        appEl.textContent = universe.map((v) => v.join('')).join('\n');
+        const score1 = universe.flat().filter(v => v === ONE).length;
+        const score2 = universe.flat().filter(v => v === TWO).length
+        score1El.textContent = `${ONE}: ${score1}`;
+        score2El.textContent = `${TWO}: ${score2}`;
+        if (!score1 || !score2) return;
+        next();
+        timer = setTimeout(draw, INTERVAL);
+    };
+
+    const change2action = () => {
+        setting2universe();
+        appEl.classList.remove(CLASS_NAME);
+        stopEl.classList.remove(CLASS_NAME);
+        settingEl.classList.add(CLASS_NAME);
+        resetEl.classList.add(CLASS_NAME);
+        playerSelectEl.classList.add(CLASS_NAME);
+        scoreAreaEl.classList.remove(CLASS_NAME);
+        startEl.disabled = true;
+        draw();
+    };
+
+    const change2setting = () => {
+        clearTimeout(timer);
+        appEl.classList.add(CLASS_NAME);
+        stopEl.classList.add(CLASS_NAME);
+        settingEl.classList.remove(CLASS_NAME);
+        resetEl.classList.remove(CLASS_NAME);
+        playerSelectEl.classList.remove(CLASS_NAME);
+        scoreAreaEl.classList.add(CLASS_NAME);
+        startEl.disabled = false;
+    };
+
+    // player change
+    const change2player = () => {
+        for (const checkEl of getCheckedCell()) {
+            if (checkEl.disabled) {
+                checkEl.removeAttribute('disabled');
+            }
+            else {
+                checkEl.setAttribute('disabled', true);
+            }
+        }
+    };
+    player1El.addEventListener('change', () => {
+        player1El.checked && change2player();
+    });
+    player2El.addEventListener('change', () => {
+        player2El.checked && change2player();
+    });
+
+    // reset
+    resetEl.addEventListener('click', () => {
+        for (const checkEl of getCheckedCell()) {
+            !checkEl.disabled && (checkEl.checked = false);
+        }
+    });
+
+    // stop
+    stopEl.addEventListener('click', change2setting);
+
+    // start
+    startEl.addEventListener('click', change2action);
+
+    // init
+    settingEl.append(...Array.from({ length: HEIGHT }, (_, row) => {
+        const divEl = document.createElement('div');
+        divEl.append(...Array.from({ length: WIDTH }, (_, col) => {
+            const inputEl = document.createElement('input');
+            inputEl.type = 'checkbox';
+            inputEl.name = 'setting';
+            inputEl.dataset.row = row;
+            inputEl.dataset.col = col;
+            return inputEl;
+        }))
+        return divEl;
+    }));
+
+    const STORAGE_KEY = 'universe';
+    window.addEventListener('keydown', e => {
+        if (!e.ctrlKey || !e.shiftKey || e.key !== 'P') return;
+        e.preventDefault();
+        const cmd = prompt([
+            'コマンドを入力してください',
+            'save [name] [rowStart-rowEnd] [colStart-colEnd]',
+            ': 現在の設定を保存します',
+            '',
+            'list',
+            ': 保存した設定の一覧を表示します',
+            '',
+            'load [name] [startRow,startCol] [rotation]?',
+            ': 保存した設定を読み込みます',
+            '',
+            'remove [name]',
+            ': 保存した設定を削除します',
+            '',
+            'clear',
+            ': 保存した設定をすべて削除します'
+        ].join('\n'))?.trim();
+        if (!cmd) return;
+        const savedUniverse = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (cmd.startsWith('save')) {
+            const [, name, rowRange, colRange] = cmd.split(' ');
+            const [rowStart, rowEnd] = rowRange?.split('-').map(Number) ?? [];
+            const [colStart, colEnd] = colRange?.split('-').map(Number) ?? [];
+            if (!name ||
+                rowStart === void 0 || Number.isNaN(rowStart) ||
+                rowEnd === void 0 || Number.isNaN(rowEnd) ||
+                colStart === void 0 || Number.isNaN(colStart) ||
+                colEnd === void 0 || Number.isNaN(colEnd)) {
+                alert('必要なパラメータが指定されていません');
+                return;
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                ...savedUniverse,
+                [name]: Array.from(getCheckedCell()).map(checkEl => {
+                    if (checkEl.disabled) return;
+                    const { row, col } = checkEl.dataset;
+                    const rowIndex = Number(row);
+                    const colIndex = Number(col);
+                    if (rowIndex < rowStart) return;
+                    if (rowEnd < rowIndex) return;
+                    if (colIndex < colStart) return;
+                    if (colEnd < colIndex) return;
+                    return [rowIndex, colIndex];
+                }).filter(v => !!v),
+            }));
+        }
+        if (cmd.startsWith('load')) {
+            const [, name, pos, rotation_] = cmd.split(' ');
+            const [y, x] = pos?.split(',').map(Number) ?? [];
+            const rotation = Number(rotation_ ?? 0);
+            if (!name ||
+                x === void 0 || Number.isNaN(x) ||
+                y === void 0 || Number.isNaN(y) ||
+                Number.isNaN(rotation)) {
+                alert('必要なパラメータが指定されていません');
+                return;
+            }
+            const rotationV = (() => {
+                switch (rotation) {
+                    case 90: {
+                        return [
+                            [0, 1],
+                            [-1, 0]
+                        ];
+                    }
+                    case 180: {
+                        return [
+                            [-1, 0],
+                            [0, -1],
+                        ];
+                    }
+                    case 270: {
+                        return [
+                            [0, -1],
+                            [1, 0]
+                        ];
+                    }
+                    default: {
+                        return;
+                    }
+                }
+            })();
+            const dot = (v1, v2) => Array.from({ length: Math.min(v1.length, v2.length) }, (_, i) => v1[i] * v2[i]).reduce((p, c) => p + c, 0);
+            const loadUniverse = (() => {
+                const rotatedUniverse =  savedUniverse[name]?.map(v => rotationV ? [dot(rotationV[0], v), dot(rotationV[1], v)] : v)
+                if (!rotatedUniverse) return;
+                const minY = Math.min(...rotatedUniverse.map(([r, c]) => r));
+                const minX = Math.min(...rotatedUniverse.map(([r, c]) => c));
+                return rotatedUniverse?.map(([r, c]) => [(r - minY + y) % HEIGHT, (c - minX + x) % WIDTH]);
+            })();
+            if (!loadUniverse) {
+                alert('load対象が見つかりません');
+                return;
+            }
+            if (Array.from(getCheckedCell()).find(checkEl => {
+                if (!checkEl.disabled) return;
+                const { row, col } = checkEl.dataset;
+                const rowIndex = Number(row);
+                const colIndex = Number(col);
+                return loadUniverse.find(([r, c]) => r === rowIndex && c === colIndex);   
+            })) {
+                alert('load位置に問題があります');
+                return;
+            }
+            for (const checkEl of settingEl.querySelectorAll('input[type="checkbox"]')) {
+                const row = Number(checkEl.dataset.row);
+                const col = Number(checkEl.dataset.col);
+                if (!loadUniverse.find(([r, c]) => r === row && c === col)) continue;
+                checkEl.checked = true;
+            }
+        }
+        if (cmd.startsWith('list')) {
+            alert(Object.keys(savedUniverse ?? {}).join('\n'));
+        }
+        if (cmd.startsWith('remove')) {
+            const [, name] = cmd.split(' ');
+            if (!name) {
+                alert('必要なパラメータが指定されていません');
+                return;
+            }
+            const {
+                [name]: _,
+                ...others
+            } = savedUniverse;
+            localStorage.setItem(STORAGE_KEY, others);
+        }
+        if (cmd.startsWith('clear')) {
+            localStorage.clear();
+        }
+    })
+</script>
+</html>
